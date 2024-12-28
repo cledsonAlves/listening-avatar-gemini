@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
- // base: "/listening-avatar-gemini/",
+  base: "/listening-avatar-gemini/",
   server: {
     host: "::",
     port: 8080,
