@@ -14,6 +14,13 @@ interface Message {
   content: string;
 }
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -65,7 +72,7 @@ const Index = () => {
 
     if (isListening) {
       try {
-        const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
@@ -80,9 +87,8 @@ const Index = () => {
           const transcript = event.results[current][0].transcript;
           
           if (event.results[current].isFinal) {
-            setTranscript(transcript);
-            processTranscript(transcript);
             setTranscript('');
+            processTranscript(transcript);
           } else {
             setTranscript(transcript);
           }
