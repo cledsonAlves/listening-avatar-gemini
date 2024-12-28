@@ -3,19 +3,16 @@ import { Avatar } from '@/components/Avatar';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/components/ui/use-toast';
 import { getGeminiResponse } from '@/services/gemini';
+import { getGroqResponse } from '@/services/groq';
 import { synthesizeSpeech, playAudio } from '@/services/polly';
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-  }
-}
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Bot, Brain } from 'lucide-react';
 
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [provider, setProvider] = useState('gemini');
   const { toast } = useToast();
 
   const startListening = useCallback(async () => {
@@ -52,8 +49,10 @@ const Index = () => {
         if (transcript) {
           try {
             setIsSpeaking(true);
-            // Get response from Gemini
-            const response = await getGeminiResponse(transcript);
+            // Get response from selected provider
+            const response = provider === 'gemini' 
+              ? await getGeminiResponse(transcript)
+              : await getGroqResponse(transcript);
             
             // Synthesize and play speech
             const audioData = await synthesizeSpeech(response);
@@ -81,7 +80,7 @@ const Index = () => {
         variant: "destructive",
       });
     }
-  }, [toast, transcript]);
+  }, [toast, transcript, provider]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-8">
@@ -90,6 +89,22 @@ const Index = () => {
         <p className="text-sm text-muted-foreground">
           Clique no avatar para começar a falar
         </p>
+        
+        <ToggleGroup 
+          type="single" 
+          value={provider} 
+          onValueChange={(value) => value && setProvider(value)}
+          className="justify-center"
+        >
+          <ToggleGroupItem value="gemini" aria-label="Usar Gemini">
+            <Brain className="mr-2" />
+            Gemini
+          </ToggleGroupItem>
+          <ToggleGroupItem value="groq" aria-label="Usar Groq">
+            <Bot className="mr-2" />
+            Groq
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       <button
