@@ -10,6 +10,7 @@ export const getGroqResponse = async (prompt: string) => {
       },
       body: JSON.stringify({
         model: 'llama3-8b-8192',
+       //  "model": "llama3-groq-70b-8192-tool-use-preview",
         messages: [{
           role: 'user',
           content: prompt

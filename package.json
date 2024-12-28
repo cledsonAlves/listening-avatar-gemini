@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "aws s3 sync ./dist s3://iara-voz --delete"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity": "^3.716.0",
