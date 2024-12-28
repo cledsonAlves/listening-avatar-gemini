@@ -6,7 +6,7 @@ export const getGroqResponse = async (prompt: string) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY || 'your-api-key'}`,
+        'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY || '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'}`,
       },
       body: JSON.stringify({
         model: 'llama3-8b-8192',
@@ -22,6 +22,7 @@ export const getGroqResponse = async (prompt: string) => {
     }
 
     const data = await response.json();
+    console.log(data);
     return data.choices[0].message.content;
   } catch (error) {
     console.error('Error calling Groq API:', error);

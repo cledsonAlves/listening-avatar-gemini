@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@/components/Avatar';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/components/ui/use-toast';
@@ -27,34 +27,39 @@ const Index = () => {
   const [transcript, setTranscript] = useState('');
   const [provider, setProvider] = useState('gemini');
   const [messages, setMessages] = useState<Message[]>([]);
+  const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
   const processTranscript = useCallback(async (transcript: string) => {
-    if (!transcript) return;
+    if (!transcript.trim()) return;
 
     try {
       setIsSpeaking(true);
-      
-      // Add user message to history
-      const userMessage: Message = { role: 'user', content: transcript };
-      setMessages(prev => [...prev, userMessage]);
 
-      // Get response from selected provider with conversation history
-      const conversationContext = messages.map(msg => msg.content).join('\n');
-      const prompt = `${conversationContext}\n${transcript}`;
-      
-      const response = provider === 'gemini' 
-        ? await getGeminiResponse(prompt)
-        : await getGroqResponse(prompt);
-      
-      // Add assistant response to history
-      const assistantMessage: Message = { role: 'assistant', content: response };
-      setMessages(prev => [...prev, assistantMessage]);
+      // Atualiza mensagens sem dependência circular
+      setMessages((prevMessages) => {
+        const userMessage: Message = { role: 'user', content: transcript };
+        const updatedMessages = [...prevMessages, userMessage];
 
-      // Synthesize and play speech
-      const audioData = await synthesizeSpeech(response);
-      await playAudio(audioData);
-      
+        (async () => {
+          const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
+          const prompt = `${conversationContext}\n${transcript}`;
+
+          const response = provider === 'gemini' 
+            ? await getGeminiResponse(prompt)
+            : await getGroqResponse(prompt);
+
+          const assistantMessage: Message = { role: 'assistant', content: response };
+          setMessages((msgs) => [...msgs, assistantMessage]);
+
+          // Reproduz áudio
+          const audioData = await synthesizeSpeech(response);
+          await playAudio(audioData);
+        })();
+
+        return updatedMessages;
+      });
+
       setIsSpeaking(false);
     } catch (error) {
       console.error('Error processing response:', error);
@@ -65,32 +70,29 @@ const Index = () => {
       });
       setIsSpeaking(false);
     }
-  }, [toast, provider, messages]);
+  }, [toast, provider]);
 
   useEffect(() => {
-    let recognition: any;
-
     if (isListening) {
       try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
+        recognitionRef.current = new SpeechRecognition();
+        const recognition = recognitionRef.current;
+
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = 'pt-BR';
 
-        recognition.onstart = () => {
-          setIsListening(true);
-        };
-
+        recognition.onstart = () => setIsListening(true);
         recognition.onresult = (event: any) => {
           const current = event.resultIndex;
-          const transcript = event.results[current][0].transcript;
-          
+          const interimTranscript = event.results[current][0].transcript;
+
           if (event.results[current].isFinal) {
             setTranscript('');
-            processTranscript(transcript);
+            processTranscript(interimTranscript);
           } else {
-            setTranscript(transcript);
+            setTranscript(interimTranscript);
           }
         };
 
@@ -114,30 +116,30 @@ const Index = () => {
         });
         setIsListening(false);
       }
+    } else if (recognitionRef.current) {
+      recognitionRef.current.stop();
     }
 
     return () => {
-      if (recognition) {
-        recognition.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
     };
   }, [isListening, processTranscript, toast]);
 
-  const toggleListening = () => {
-    setIsListening(!isListening);
-  };
+  const toggleListening = () => setIsListening((prev) => !prev);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-8">
       <div className="text-center space-y-4 max-w-md mx-auto">
-        <h1 className="text-2xl font-semibold tracking-tight">Assistente IA</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Iara Hub - Assistente IA</h1>
         <p className="text-sm text-muted-foreground">
           {isListening ? 'Escutando...' : 'Clique no microfone para começar'}
         </p>
-        
-        <ToggleGroup 
-          type="single" 
-          value={provider} 
+
+        <ToggleGroup
+          type="single"
+          value={provider}
           onValueChange={(value) => value && setProvider(value)}
           className="justify-center"
         >
@@ -161,10 +163,7 @@ const Index = () => {
         </Button>
       </div>
 
-      <div className="transform transition-transform duration-300 hover:scale-105">
-        <Avatar isListening={isListening} isSpeaking={isSpeaking} />
-      </div>
-
+      <Avatar isListening={isListening} isSpeaking={isSpeaking} />
       <AudioVisualizer isActive={isListening || isSpeaking} />
 
       {transcript && (
@@ -172,21 +171,6 @@ const Index = () => {
           <p className="text-sm text-center">{transcript}</p>
         </div>
       )}
-
-      <div className="max-w-md w-full mx-auto space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`p-4 rounded-lg ${
-              message.role === 'user' 
-                ? 'bg-blue-100 ml-8' 
-                : 'bg-gray-100 mr-8'
-            }`}
-          >
-            <p className="text-sm">{message.content}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };

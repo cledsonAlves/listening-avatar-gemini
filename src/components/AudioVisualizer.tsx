@@ -6,18 +6,22 @@ interface AudioVisualizerProps {
 }
 
 export const AudioVisualizer = ({ isActive }: AudioVisualizerProps) => {
-  const [heights, setHeights] = useState<number[]>(Array(12).fill(2));
+  const BAR_COUNT = 12;
+  const DEFAULT_HEIGHT = 2;
+
+  const [heights, setHeights] = useState<number[]>(Array(BAR_COUNT).fill(DEFAULT_HEIGHT));
+
+  // Função para gerar alturas randomizadas
+  const generateRandomHeight = () => Math.random() * 32 + 4;
 
   useEffect(() => {
     if (!isActive) {
-      setHeights(Array(12).fill(2));
+      setHeights(Array(BAR_COUNT).fill(DEFAULT_HEIGHT));
       return;
     }
 
     const interval = setInterval(() => {
-      setHeights(prev => 
-        prev.map(() => isActive ? Math.random() * 32 + 4 : 2)
-      );
+      setHeights(prev => prev.map(() => generateRandomHeight()));
     }, 100);
 
     return () => clearInterval(interval);
@@ -25,12 +29,12 @@ export const AudioVisualizer = ({ isActive }: AudioVisualizerProps) => {
 
   return (
     <div className="audio-visualizer">
-      {heights.map((height, i) => (
+      {heights.map((height, index) => (
         <div
-          key={i}
+          key={index}
           className={cn(
-            "audio-bar",
-            isActive ? "opacity-100" : "opacity-50"
+            'audio-bar',
+            isActive ? 'opacity-100' : 'opacity-50'
           )}
           style={{ height: `${height}px` }}
         />
