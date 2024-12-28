@@ -7,6 +7,13 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   base: "/listening-avatar-gemini/",
   server: {
+    proxy: {
+      '/api/ttsopenai': {
+        target: 'https://api.ttsopenai.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ttsopenai/, '/uapi/v1/text-to-speech'),
+      },
+    },
     host: "::",
     port: 8080,
   },
@@ -25,3 +32,5 @@ export default defineConfig(({ mode }) => ({
     assetsDir: 'assets',
   },
 }));
+
+

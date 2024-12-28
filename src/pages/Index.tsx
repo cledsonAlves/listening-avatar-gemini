@@ -4,13 +4,14 @@ import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/components/ui/use-toast';
 import { getGeminiResponse } from '@/services/gemini';
 import { getGroqResponse } from '@/services/groq';
-import { synthesizeSpeech, playAudio } from '@/services/polly';
+import { synthesizeSpeech as synthesizeWithPolly, playAudio } from '@/services/polly';
+import { synthesizeSpeech as synthesizeWithTTSOpenAI } from '@/services/ttsopenai';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Bot, Brain, Mic, MicOff } from 'lucide-react';
+import { Bot, Brain, Mic, MicOff, Volleyball } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: 'user';
   content: string;
 }
 
@@ -21,11 +22,26 @@ declare global {
   }
 }
 
+// Função para reprodução de áudio de uma URL
+const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
+  try {
+    console.log('[Audio] Reproduzindo áudio da URL:', audioUrl);
+    const audio = new Audio(audioUrl);
+    await audio.play();
+
+    audio.onended = () => console.log('[Audio] Reprodução finalizada.');
+    audio.onerror = () => console.error('[Audio] Erro durante a reprodução.');
+  } catch (error) {
+    console.error('[Audio] Erro ao reproduzir o áudio:', error);
+  }
+};
+
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [provider, setProvider] = useState('groq'); // Default: Groq habilitado
+  const [ttsProvider, setTTSProvider] = useState<'polly' | 'ttsopenai'>('polly'); // Default: Polly
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -34,7 +50,8 @@ const Index = () => {
     if (!transcript.trim()) return;
 
     try {
-      setIsListening(false); // Desativa o microfone enquanto o assistente fala
+      console.log('[Transcript] Processando:', transcript);
+      setIsListening(false);
 
       setMessages((prevMessages) => {
         const userMessage: Message = { role: 'user', content: transcript };
@@ -44,17 +61,31 @@ const Index = () => {
           const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
           const prompt = `${conversationContext}\n${transcript}`;
 
+          console.log('[API] Solicitando resposta...');
           const response = provider === 'gemini' 
             ? await getGeminiResponse(prompt)
             : await getGroqResponse(prompt);
 
+          console.log('[API] Resposta recebida:', response);
           const assistantMessage: Message = { role: 'assistant', content: response };
           setMessages((msgs) => [...msgs, assistantMessage]);
 
-          // Reproduz áudio
-          const audioData = await synthesizeSpeech(response);
-          setIsSpeaking(true);
-          await playAudio(audioData);
+          let audioUrl;
+          if (ttsProvider === 'polly') {
+            console.log('[TTS] Utilizando Polly...');
+            const audioData = await synthesizeWithPolly(response);
+            audioUrl = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
+            await playAudio(audioData); // Reprodução para Polly
+          } else if (ttsProvider === 'ttsopenai') {
+            console.log('[TTS] Utilizando TTS OpenAI...');
+            audioUrl = await synthesizeWithTTSOpenAI(response);
+            if (audioUrl) {
+              await playAudioFromUrl(audioUrl); // Reprodução para TTS OpenAI
+            } else {
+              console.error('[Audio] URL de áudio não encontrada.');
+            }
+          }
+
           setIsSpeaking(false);
           setIsListening(true);
         })();
@@ -62,28 +93,28 @@ const Index = () => {
         return updatedMessages;
       });
     } catch (error) {
-      console.error('Error processing response:', error);
+      console.error('[Transcript] Erro durante o processamento:', error);
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao processar sua mensagem.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Falha ao processar sua mensagem.',
+        variant: 'destructive',
       });
       setIsSpeaking(false);
     }
-  }, [toast, provider]);
+  }, [toast, provider, ttsProvider]);
 
   useEffect(() => {
     if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
       toast({
-        title: "Erro",
-        description: "Reconhecimento de voz não é suportado neste navegador.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Reconhecimento de voz não é suportado neste navegador.',
+        variant: 'destructive',
       });
       return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let timeoutId;
+    let timeoutId: NodeJS.Timeout;
 
     if (isListening) {
       try {
@@ -91,7 +122,7 @@ const Index = () => {
         const recognition = recognitionRef.current;
 
         recognition.continuous = true;
-        recognition.interimResults = false; // Melhora a precisão
+        recognition.interimResults = false;
         recognition.lang = 'pt-BR';
 
         recognition.onstart = () => setIsListening(true);
@@ -106,12 +137,12 @@ const Index = () => {
         };
 
         recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
+          console.error('Erro no reconhecimento de voz:', event.error);
           setIsListening(false);
           toast({
-            title: "Erro",
-            description: "Falha no reconhecimento de voz. Tente novamente.",
-            variant: "destructive",
+            title: 'Erro',
+            description: 'Falha no reconhecimento de voz. Tente novamente.',
+            variant: 'destructive',
           });
         };
 
@@ -121,17 +152,16 @@ const Index = () => {
           setIsListening(false);
           recognition.stop();
           toast({
-            title: "Timeout",
-            description: "Nenhuma fala detectada. Reconhecimento de voz encerrado.",
+            title: 'Timeout',
+            description: 'Nenhuma fala detectada. Reconhecimento de voz encerrado.',
           });
         }, 60000); // Timeout de 60 segundos
-
       } catch (error) {
-        console.error('Speech recognition error:', error);
+        console.error('Erro ao iniciar reconhecimento de voz:', error);
         toast({
-          title: "Erro",
-          description: "Erro ao iniciar reconhecimento de voz.",
-          variant: "destructive",
+          title: 'Erro',
+          description: 'Erro ao iniciar reconhecimento de voz.',
+          variant: 'destructive',
         });
         setIsListening(false);
       }
@@ -173,9 +203,25 @@ const Index = () => {
           </ToggleGroupItem>
         </ToggleGroup>
 
+        <ToggleGroup
+          type="single"
+          value={ttsProvider}
+          onValueChange={(value) => value && setTTSProvider(value as 'polly' | 'ttsopenai')}
+          className="justify-center mt-4"
+        >
+          <ToggleGroupItem value="polly" aria-label="Usar Polly">
+            <Volleyball className="mr-2" />
+            Polly
+          </ToggleGroupItem>
+          <ToggleGroupItem value="ttsopenai" aria-label="Usar TTS OpenAI">
+            <Volleyball className="mr-2" />
+            TTS OpenAI
+          </ToggleGroupItem>
+        </ToggleGroup>
+
         <Button
           onClick={toggleListening}
-          variant={isListening ? "destructive" : "default"}
+          variant={isListening ? 'destructive' : 'default'}
           className="mt-4"
         >
           {isListening ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
