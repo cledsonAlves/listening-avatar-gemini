@@ -2,6 +2,15 @@ import { useState, useCallback, useEffect } from 'react';
 import { Avatar } from '@/components/Avatar';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/components/ui/use-toast';
+import { getGeminiResponse } from '@/services/gemini';
+import { synthesizeSpeech, playAudio } from '@/services/polly';
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
 
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
@@ -11,63 +20,75 @@ const Index = () => {
 
   const startListening = useCallback(async () => {
     try {
-      const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
+      recognition.lang = 'pt-BR';
 
       recognition.onstart = () => {
         setIsListening(true);
         setTranscript('');
       };
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: any) => {
         const current = event.resultIndex;
         const transcript = event.results[current][0].transcript;
         setTranscript(transcript);
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
         toast({
-          title: "Error",
-          description: "Failed to start listening. Please try again.",
+          title: "Erro",
+          description: "Falha ao iniciar o reconhecimento de voz. Tente novamente.",
           variant: "destructive",
         });
       };
 
-      recognition.onend = () => {
+      recognition.onend = async () => {
         setIsListening(false);
-        // Here you would call Gemini API with the transcript
-        // Then call AWS Polly with the response
-        // For now, we'll simulate it
-        simulateResponse();
+        if (transcript) {
+          try {
+            setIsSpeaking(true);
+            // Get response from Gemini
+            const response = await getGeminiResponse(transcript);
+            
+            // Synthesize and play speech
+            const audioData = await synthesizeSpeech(response);
+            await playAudio(audioData);
+            
+            setIsSpeaking(false);
+          } catch (error) {
+            console.error('Error processing response:', error);
+            toast({
+              title: "Erro",
+              description: "Ocorreu um erro ao processar sua mensagem.",
+              variant: "destructive",
+            });
+            setIsSpeaking(false);
+          }
+        }
       };
 
       recognition.start();
     } catch (error) {
       console.error('Speech recognition error:', error);
       toast({
-        title: "Error",
-        description: "Speech recognition is not supported in your browser.",
+        title: "Erro",
+        description: "Reconhecimento de voz não é suportado neste navegador.",
         variant: "destructive",
       });
     }
-  }, [toast]);
-
-  const simulateResponse = () => {
-    setIsSpeaking(true);
-    setTimeout(() => {
-      setIsSpeaking(false);
-    }, 3000);
-  };
+  }, [toast, transcript]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-8">
       <div className="text-center space-y-4 max-w-md mx-auto">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Assistant</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Assistente IA</h1>
         <p className="text-sm text-muted-foreground">
-          Click the avatar to start speaking
+          Clique no avatar para começar a falar
         </p>
       </div>
 
