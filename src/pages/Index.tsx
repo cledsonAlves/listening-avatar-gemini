@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getGeminiResponse } from '@/services/gemini';
 import { getGroqResponse } from '@/services/groq';
 import { synthesizeSpeech, playAudio } from '@/services/polly';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Bot, Brain, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -25,7 +25,7 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [provider, setProvider] = useState('gemini');
+  const [provider, setProvider] = useState('groq'); // Default: Groq habilitado
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -36,7 +36,6 @@ const Index = () => {
     try {
       setIsListening(false); // Desativa o microfone enquanto o assistente fala
 
-      // Atualiza mensagens
       setMessages((prevMessages) => {
         const userMessage: Message = { role: 'user', content: transcript };
         const updatedMessages = [...prevMessages, userMessage];
@@ -54,16 +53,9 @@ const Index = () => {
 
           // Reproduz áudio
           const audioData = await synthesizeSpeech(response);
-
-          // Atualiza o estado para indicar que o assistente está falando
           setIsSpeaking(true);
-
           await playAudio(audioData);
-
-          // Finaliza o estado de isSpeaking após o término da reprodução do áudio
           setIsSpeaking(false);
-
-          // Reativa o microfone após terminar de falar
           setIsListening(true);
         })();
 
@@ -81,26 +73,35 @@ const Index = () => {
   }, [toast, provider]);
 
   useEffect(() => {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      toast({
+        title: "Erro",
+        description: "Reconhecimento de voz não é suportado neste navegador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let timeoutId;
+
     if (isListening) {
       try {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
 
         recognition.continuous = true;
-        recognition.interimResults = true;
+        recognition.interimResults = false; // Melhora a precisão
         recognition.lang = 'pt-BR';
 
         recognition.onstart = () => setIsListening(true);
         recognition.onresult = (event: any) => {
           const current = event.resultIndex;
-          const interimTranscript = event.results[current][0].transcript;
+          const finalTranscript = event.results[current][0].transcript;
 
           if (event.results[current].isFinal) {
             setTranscript('');
-            processTranscript(interimTranscript);
-          } else {
-            setTranscript(interimTranscript);
+            processTranscript(finalTranscript);
           }
         };
 
@@ -115,11 +116,21 @@ const Index = () => {
         };
 
         recognition.start();
+
+        timeoutId = setTimeout(() => {
+          setIsListening(false);
+          recognition.stop();
+          toast({
+            title: "Timeout",
+            description: "Nenhuma fala detectada. Reconhecimento de voz encerrado.",
+          });
+        }, 60000); // Timeout de 60 segundos
+
       } catch (error) {
         console.error('Speech recognition error:', error);
         toast({
           title: "Erro",
-          description: "Reconhecimento de voz não é suportado neste navegador.",
+          description: "Erro ao iniciar reconhecimento de voz.",
           variant: "destructive",
         });
         setIsListening(false);
@@ -129,13 +140,14 @@ const Index = () => {
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      if (recognitionRef.current) recognitionRef.current.stop();
+      clearTimeout(timeoutId);
     };
   }, [isListening, processTranscript, toast]);
 
-  const toggleListening = () => setIsListening((prev) => !prev);
+  const toggleListening = () => {
+    setIsListening((prev) => !prev);
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-8">
@@ -173,9 +185,7 @@ const Index = () => {
 
       <Avatar isListening={isListening} isSpeaking={isSpeaking} />
 
-      {/* Atualizado: Passa isSpeaking como condição para animar o AudioVisualizer */}
       <AudioVisualizer isActive={isListening || isSpeaking} />
-
 
       {transcript && (
         <div className="glass-panel p-4 rounded-lg max-w-md w-full mx-auto">
