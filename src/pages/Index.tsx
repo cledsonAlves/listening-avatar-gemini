@@ -34,9 +34,9 @@ const Index = () => {
     if (!transcript.trim()) return;
 
     try {
-      setIsSpeaking(true);
+      setIsListening(false); // Desativa o microfone enquanto o assistente fala
 
-      // Atualiza mensagens sem dependência circular
+      // Atualiza mensagens
       setMessages((prevMessages) => {
         const userMessage: Message = { role: 'user', content: transcript };
         const updatedMessages = [...prevMessages, userMessage];
@@ -54,13 +54,21 @@ const Index = () => {
 
           // Reproduz áudio
           const audioData = await synthesizeSpeech(response);
+
+          // Atualiza o estado para indicar que o assistente está falando
+          setIsSpeaking(true);
+
           await playAudio(audioData);
+
+          // Finaliza o estado de isSpeaking após o término da reprodução do áudio
+          setIsSpeaking(false);
+
+          // Reativa o microfone após terminar de falar
+          setIsListening(true);
         })();
 
         return updatedMessages;
       });
-
-      setIsSpeaking(false);
     } catch (error) {
       console.error('Error processing response:', error);
       toast({
@@ -164,7 +172,10 @@ const Index = () => {
       </div>
 
       <Avatar isListening={isListening} isSpeaking={isSpeaking} />
+
+      {/* Atualizado: Passa isSpeaking como condição para animar o AudioVisualizer */}
       <AudioVisualizer isActive={isListening || isSpeaking} />
+
 
       {transcript && (
         <div className="glass-panel p-4 rounded-lg max-w-md w-full mx-auto">
