@@ -3,9 +3,10 @@ import { cn } from '@/lib/utils';
 
 interface AudioVisualizerProps {
   isActive: boolean;
+  mode: 'user' | 'ai';
 }
 
-export const AudioVisualizer = ({ isActive }: AudioVisualizerProps) => {
+export const AudioVisualizer = ({ isActive, mode }: AudioVisualizerProps) => {
   const BAR_COUNT = 12;
   const DEFAULT_HEIGHT = 2;
 
@@ -28,12 +29,13 @@ export const AudioVisualizer = ({ isActive }: AudioVisualizerProps) => {
   }, [isActive]);
 
   return (
-    <div className="audio-visualizer">
+    <div className="audio-visualizer flex gap-1 items-center justify-center absolute -bottom-8 left-1/2 transform -translate-x-1/2">
       {heights.map((height, index) => (
         <div
           key={index}
           className={cn(
-            'audio-bar',
+            'audio-bar w-1 rounded-full transition-all duration-100',
+            mode === 'user' ? 'bg-primary' : 'bg-orange-500',
             isActive ? 'opacity-100' : 'opacity-50'
           )}
           style={{ height: `${height}px` }}

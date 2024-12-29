@@ -29,6 +29,13 @@ const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
   }
 };
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -218,7 +225,10 @@ const Index = () => {
 
       <div className="relative">
         <Avatar className={isListening ? 'animate-pulse' : ''} />
-        <AudioVisualizer isActive={isListening || isSpeaking} />
+        <AudioVisualizer 
+          isActive={isListening || isSpeaking} 
+          mode={isListening ? 'user' : 'ai'} 
+        />
       </div>
 
       {transcript && (
