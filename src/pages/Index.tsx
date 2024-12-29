@@ -7,20 +7,13 @@ import { getGroqResponse } from '@/services/groq';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { synthesizeSpeech as synthesizeWithPolly } from '@/services/polly';
 import { synthesizeSpeech as synthesizeWithTTSOpenAI } from '@/services/ttsopenai';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Bot, Brain, Mic, MicOff, Volleyball } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Mic, MicOff } from 'lucide-react';
+import { ProviderSelector } from '@/components/ProviderSelector';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
 }
 
 const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
@@ -174,7 +167,7 @@ const Index = () => {
             title: 'Timeout',
             description: 'Nenhuma fala detectada. Reconhecimento de voz encerrado.',
           });
-        }, 60000); // Timeout de 60 segundos
+        }, 60000);
       } catch (error) {
         console.error('Erro ao iniciar reconhecimento de voz:', error);
         toast({
@@ -206,43 +199,12 @@ const Index = () => {
           {isListening ? 'Escutando...' : 'Clique no microfone para começar'}
         </p>
 
-        <ToggleGroup
-          type="single"
-          value={provider}
-          onValueChange={(value) => value && setProvider(value)}
-          className="justify-center"
-        >
-          <ToggleGroupItem value="gemini" aria-label="Usar Gemini">
-            <Brain className="mr-2" />
-            Gemini
-          </ToggleGroupItem>
-          <ToggleGroupItem value="groq" aria-label="Usar Groq">
-            <Bot className="mr-2" />
-            Groq
-          </ToggleGroupItem>
-          <ToggleGroupItem value="iaraai" aria-label="Usar IARA AI">
-            <Bot className="mr-2" />
-            IARA AI
-          </ToggleGroupItem>
-        </ToggleGroup>
-
-        {provider !== 'iaraai' && (
-          <ToggleGroup
-            type="single"
-            value={ttsProvider}
-            onValueChange={(value) => value && setTTSProvider(value as 'polly' | 'ttsopenai' | 'iaraai')}
-            className="justify-center mt-4"
-          >
-            <ToggleGroupItem value="polly" aria-label="Usar Polly">
-              <Volleyball className="mr-2" />
-              Polly
-            </ToggleGroupItem>
-            <ToggleGroupItem value="ttsopenai" aria-label="Usar TTS OpenAI">
-              <Volleyball className="mr-2" />
-              TTS OpenAI
-            </ToggleGroupItem>
-          </ToggleGroup>
-        )}
+        <ProviderSelector
+          provider={provider}
+          onProviderChange={setProvider}
+          ttsProvider={ttsProvider}
+          onTTSProviderChange={(value) => setTTSProvider(value as 'polly' | 'ttsopenai' | 'iaraai')}
+        />
 
         <Button
           onClick={toggleListening}
