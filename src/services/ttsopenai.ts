@@ -1,32 +1,26 @@
 import axios from "axios";
 
-const TTSOpenAI = {
-  url: "/api/ttsopenai",
-  headers: {
-    "Content-Type": "application/json",
-  },
+const BFF_API_URL = "https://bff-iarahub.vercel.app/api/webhook";
 
-  async synthesizeSpeech(text: string): Promise<string | null> {
-    console.log(`[TTS OpenAI] Iniciando a síntese de fala para o texto: "${text}"`);
-    const data = {
-      model: "tts-1",
-      voice_id: "OA001",
-      speed: 1,
-      input: text,
-    };
+export const synthesizeSpeech = async (text: string): Promise<string> => {
+  try {
+    const response = await axios.get("https://bff-iarahub.vercel.app/api/webhook", {
+      params: { text },
+      timeout: 30000, // Timeout de 30 segundos
+    });
 
-    try {
-      const response = await axios.post(this.url, data, {
-        headers: this.headers,
-      });
-
-      console.log("[TTS OpenAI] Resposta recebida:", response.data);
-      return response.data.audio_url;
-    } catch (error) {
-      console.error("[TTS OpenAI] Erro ao sintetizar fala:", error);
-      throw new Error("Failed to synthesize speech with TTS OpenAI");
+    if (response.data && response.data.mediaUrl) {
+      return response.data.mediaUrl;
+    } else {
+      throw new Error("URL da mídia não encontrada na resposta do BFF.");
     }
-  },
+  } catch (error) {
+    if (error.code === "ECONNABORTED") {
+      console.error("Erro: Timeout ao aguardar resposta do BFF.");
+    } else {
+      console.error("Erro ao sintetizar fala:", error.message);
+    }
+    throw error;
+  }
 };
 
-export const synthesizeSpeech = TTSOpenAI.synthesizeSpeech.bind(TTSOpenAI);

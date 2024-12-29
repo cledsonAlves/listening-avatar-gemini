@@ -39,7 +39,7 @@ export const PinDialog = ({ isOpen, onClose, onSuccess }: PinDialogProps) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Área Restrita</DialogTitle>
+          <DialogTitle>Área Restrita - Assinantes</DialogTitle>
           <DialogDescription>
             Digite o PIN para acessar o provedor IARA AI
           </DialogDescription>
