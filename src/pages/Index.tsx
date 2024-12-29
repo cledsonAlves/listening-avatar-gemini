@@ -11,7 +11,7 @@ import { Bot, Brain, Mic, MicOff, Volleyball } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Message {
-  role: 'user';
+  role: 'user' | 'assistant';
   content: string;
 }
 

@@ -1,10 +1,9 @@
 import axios from "axios";
 
 const TTSOpenAI = {
-    url: "https://cors-anywhere.herokuapp.com/https://api.ttsopenai.com/uapi/v1/text-to-speech",
+  url: "/api/ttsopenai",
   headers: {
     "Content-Type": "application/json",
-    "x-api-key": import.meta.env.VITE_TTS_OPENAI_API_KEY || "tts-ef9db4c5766e6ce72cf4c71f52fb70bd", // Substitua pela sua chave da API TTS OpenAI
   },
 
   async synthesizeSpeech(text: string): Promise<string | null> {
@@ -22,7 +21,7 @@ const TTSOpenAI = {
       });
 
       console.log("[TTS OpenAI] Resposta recebida:", response.data);
-      return response.data.audio_url; // Supondo que a API retorna uma URL de áudio
+      return response.data.audio_url;
     } catch (error) {
       console.error("[TTS OpenAI] Erro ao sintetizar fala:", error);
       throw new Error("Failed to synthesize speech with TTS OpenAI");
@@ -30,4 +29,4 @@ const TTSOpenAI = {
   },
 };
 
-export const synthesizeSpeech = TTSOpenAI.synthesizeSpeech.bind(TTSOpenAI); // Exporta corretamente
+export const synthesizeSpeech = TTSOpenAI.synthesizeSpeech.bind(TTSOpenAI);
