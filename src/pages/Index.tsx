@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { getGeminiResponse } from '@/services/gemini';
 import { getGroqResponse } from '@/services/groq';
 import { getIaraAIResponse } from '@/services/iaraai';
@@ -29,9 +29,10 @@ const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
     const audio = new Audio(audioUrl);
     await audio.play();
     audio.onended = () => console.log('[Audio] Reprodução finalizada.');
-    audio.onerror = () => console.error('[Audio] Erro durante a reprodução.');
+    audio.onerror = (e) => console.error('[Audio] Erro durante a reprodução:', e);
   } catch (error) {
     console.error('[Audio] Erro ao reproduzir o áudio:', error);
+    throw error;
   }
 };
 
@@ -51,49 +52,61 @@ const Index = () => {
     try {
       console.log('[Transcript] Processando:', transcript);
       setIsListening(false);
+      setIsSpeaking(true);
 
       setMessages((prevMessages) => {
         const userMessage: Message = { role: 'user', content: transcript };
         const updatedMessages = [...prevMessages, userMessage];
 
         (async () => {
-          const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
-          const prompt = `${conversationContext}\n${transcript}`;
+          try {
+            const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
+            const prompt = `${conversationContext}\n${transcript}`;
 
-          console.log('[API] Solicitando resposta...');
-          let response: string;
-          let audioUrl: string | null = null;
+            console.log('[API] Solicitando resposta...');
+            let response: string;
+            let audioUrl: string | null = null;
 
-          if (provider === 'iaraai') {
-            const iaraResponse = await getIaraAIResponse(prompt);
-            response = iaraResponse.text;
-            audioUrl = iaraResponse.audioUrl;
-          } else {
-            response = provider === 'gemini' 
-              ? await getGeminiResponse(prompt)
-              : await getGroqResponse(prompt);
-            
-            if (ttsProvider === 'polly') {
-              console.log('[TTS] Utilizando Polly...');
-              const audioData = await synthesizeWithPolly(response);
-              const blob = new Blob([audioData], { type: 'audio/mpeg' });
-              audioUrl = URL.createObjectURL(blob);
-            } else if (ttsProvider === 'ttsopenai') {
-              console.log('[TTS] Utilizando TTS OpenAI...');
-              audioUrl = await synthesizeWithTTSOpenAI(response);
+            if (provider === 'iaraai') {
+              const iaraResponse = await getIaraAIResponse(prompt);
+              response = iaraResponse.text;
+              audioUrl = iaraResponse.audioUrl;
+              console.log('[IARA AI] Áudio URL recebida:', audioUrl);
+            } else {
+              response = provider === 'gemini' 
+                ? await getGeminiResponse(prompt)
+                : await getGroqResponse(prompt);
+              
+              if (ttsProvider === 'polly') {
+                console.log('[TTS] Utilizando Polly...');
+                const audioData = await synthesizeWithPolly(response);
+                const blob = new Blob([audioData], { type: 'audio/mpeg' });
+                audioUrl = URL.createObjectURL(blob);
+              } else if (ttsProvider === 'ttsopenai') {
+                console.log('[TTS] Utilizando TTS OpenAI...');
+                audioUrl = await synthesizeWithTTSOpenAI(response);
+              }
             }
+
+            console.log('[API] Resposta recebida:', response);
+            const assistantMessage: Message = { role: 'assistant', content: response };
+            setMessages(msgs => [...msgs, assistantMessage]);
+
+            if (audioUrl) {
+              await playAudioFromUrl(audioUrl);
+            }
+
+            setIsSpeaking(false);
+            setIsListening(true);
+          } catch (error) {
+            console.error('[Processamento] Erro:', error);
+            toast({
+              title: 'Erro',
+              description: 'Ocorreu um erro ao processar sua mensagem.',
+              variant: 'destructive',
+            });
+            setIsSpeaking(false);
           }
-
-          console.log('[API] Resposta recebida:', response);
-          const assistantMessage: Message = { role: 'assistant', content: response };
-          setMessages(msgs => [...msgs, assistantMessage]);
-
-          if (audioUrl) {
-            await playAudioFromUrl(audioUrl);
-          }
-
-          setIsSpeaking(false);
-          setIsListening(true);
         })();
 
         return updatedMessages;
@@ -241,8 +254,10 @@ const Index = () => {
         </Button>
       </div>
 
-      <Avatar isListening={isListening} isSpeaking={isSpeaking} />
-      <AudioVisualizer isActive={isListening || isSpeaking} />
+      <div className="relative">
+        <Avatar className={isListening ? 'animate-pulse' : ''} />
+        <AudioVisualizer isActive={isListening || isSpeaking} />
+      </div>
 
       {transcript && (
         <div className="glass-panel p-4 rounded-lg max-w-md w-full mx-auto">

@@ -9,15 +9,22 @@ export const getIaraAIResponse = async (prompt: string): Promise<{ text: string;
     }, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      responseType: 'arraybuffer' // Importante: especifica que esperamos um buffer
     });
 
-    console.log('[IARA AI] Resposta recebida:', response.data);
+    // Converte o buffer em base64 e cria uma URL do blob
+    const audioBlob = new Blob([response.data], { type: 'audio/wav' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // Extrai o texto da resposta do cabeçalho
+    const text = response.headers['x-response-text'] || 'Resposta da IARA AI';
+
+    console.log('[IARA AI] Resposta recebida:', { text, audioUrl });
     
-    // A API já retorna o texto e o áudio sintetizado
     return {
-      text: response.data.text,
-      audioUrl: response.data.audioUrl
+      text,
+      audioUrl
     };
   } catch (error) {
     console.error('[IARA AI] Erro ao obter resposta:', error);
