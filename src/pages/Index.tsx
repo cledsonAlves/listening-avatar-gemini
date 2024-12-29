@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Avatar } from '@/components/Avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/components/ui/use-toast';
 import { getGeminiResponse } from '@/services/gemini';
 import { getGroqResponse } from '@/services/groq';
-import { synthesizeSpeech as synthesizeWithPolly, playAudio } from '@/services/polly';
+import { getIaraAIResponse } from '@/services/iaraai';
+import { synthesizeSpeech as synthesizeWithPolly } from '@/services/polly';
 import { synthesizeSpeech as synthesizeWithTTSOpenAI } from '@/services/ttsopenai';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Bot, Brain, Mic, MicOff, Volleyball } from 'lucide-react';
@@ -22,13 +23,11 @@ declare global {
   }
 }
 
-// Função para reprodução de áudio de uma URL
 const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
   try {
     console.log('[Audio] Reproduzindo áudio da URL:', audioUrl);
     const audio = new Audio(audioUrl);
     await audio.play();
-
     audio.onended = () => console.log('[Audio] Reprodução finalizada.');
     audio.onerror = () => console.error('[Audio] Erro durante a reprodução.');
   } catch (error) {
@@ -40,8 +39,8 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [provider, setProvider] = useState('groq'); // Default: Groq habilitado
-  const [ttsProvider, setTTSProvider] = useState<'polly' | 'ttsopenai'>('polly'); // Default: Polly
+  const [provider, setProvider] = useState('groq');
+  const [ttsProvider, setTTSProvider] = useState<'polly' | 'ttsopenai' | 'iaraai'>('polly');
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -62,28 +61,35 @@ const Index = () => {
           const prompt = `${conversationContext}\n${transcript}`;
 
           console.log('[API] Solicitando resposta...');
-          const response = provider === 'gemini' 
-            ? await getGeminiResponse(prompt)
-            : await getGroqResponse(prompt);
+          let response: string;
+          let audioUrl: string | null = null;
+
+          if (provider === 'iaraai') {
+            const iaraResponse = await getIaraAIResponse(prompt);
+            response = iaraResponse.text;
+            audioUrl = iaraResponse.audioUrl;
+          } else {
+            response = provider === 'gemini' 
+              ? await getGeminiResponse(prompt)
+              : await getGroqResponse(prompt);
+            
+            if (ttsProvider === 'polly') {
+              console.log('[TTS] Utilizando Polly...');
+              const audioData = await synthesizeWithPolly(response);
+              const blob = new Blob([audioData], { type: 'audio/mpeg' });
+              audioUrl = URL.createObjectURL(blob);
+            } else if (ttsProvider === 'ttsopenai') {
+              console.log('[TTS] Utilizando TTS OpenAI...');
+              audioUrl = await synthesizeWithTTSOpenAI(response);
+            }
+          }
 
           console.log('[API] Resposta recebida:', response);
           const assistantMessage: Message = { role: 'assistant', content: response };
-          setMessages((msgs) => [...msgs, assistantMessage]);
+          setMessages(msgs => [...msgs, assistantMessage]);
 
-          let audioUrl;
-          if (ttsProvider === 'polly') {
-            console.log('[TTS] Utilizando Polly...');
-            const audioData = await synthesizeWithPolly(response);
-            audioUrl = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
-            await playAudio(audioData); // Reprodução para Polly
-          } else if (ttsProvider === 'ttsopenai') {
-            console.log('[TTS] Utilizando TTS OpenAI...');
-            audioUrl = await synthesizeWithTTSOpenAI(response);
-            if (audioUrl) {
-              await playAudioFromUrl(audioUrl); // Reprodução para TTS OpenAI
-            } else {
-              console.error('[Audio] URL de áudio não encontrada.');
-            }
+          if (audioUrl) {
+            await playAudioFromUrl(audioUrl);
           }
 
           setIsSpeaking(false);
@@ -201,23 +207,29 @@ const Index = () => {
             <Bot className="mr-2" />
             Groq
           </ToggleGroupItem>
+          <ToggleGroupItem value="iaraai" aria-label="Usar IARA AI">
+            <Bot className="mr-2" />
+            IARA AI
+          </ToggleGroupItem>
         </ToggleGroup>
 
-        <ToggleGroup
-          type="single"
-          value={ttsProvider}
-          onValueChange={(value) => value && setTTSProvider(value as 'polly' | 'ttsopenai')}
-          className="justify-center mt-4"
-        >
-          <ToggleGroupItem value="polly" aria-label="Usar Polly">
-            <Volleyball className="mr-2" />
-            Polly
-          </ToggleGroupItem>
-          <ToggleGroupItem value="ttsopenai" aria-label="Usar TTS OpenAI">
-            <Volleyball className="mr-2" />
-            TTS OpenAI
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {provider !== 'iaraai' && (
+          <ToggleGroup
+            type="single"
+            value={ttsProvider}
+            onValueChange={(value) => value && setTTSProvider(value as 'polly' | 'ttsopenai' | 'iaraai')}
+            className="justify-center mt-4"
+          >
+            <ToggleGroupItem value="polly" aria-label="Usar Polly">
+              <Volleyball className="mr-2" />
+              Polly
+            </ToggleGroupItem>
+            <ToggleGroupItem value="ttsopenai" aria-label="Usar TTS OpenAI">
+              <Volleyball className="mr-2" />
+              TTS OpenAI
+            </ToggleGroupItem>
+          </ToggleGroup>
+        )}
 
         <Button
           onClick={toggleListening}
@@ -230,7 +242,6 @@ const Index = () => {
       </div>
 
       <Avatar isListening={isListening} isSpeaking={isSpeaking} />
-
       <AudioVisualizer isActive={isListening || isSpeaking} />
 
       {transcript && (
