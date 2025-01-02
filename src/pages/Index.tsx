@@ -3,11 +3,6 @@ import { useToast } from '@/hooks/use-toast';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { AudioInterface } from '@/components/AudioInterface';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -32,7 +27,6 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -43,50 +37,28 @@ const Index = () => {
       console.log('[Transcript] Processando:', transcript);
       setIsListening(false);
       setIsSpeaking(true);
+      setTranscript('Aguarde, estou processando sua mensagem...');
 
-      setMessages(prevMessages => {
-        const userMessage: Message = { role: 'user', content: transcript };
-        const updatedMessages = [...prevMessages, userMessage];
+      const { text, audioUrl } = await getIaraAIResponse(transcript);
 
-        (async () => {
-          try {
-            const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
-            const prompt = `${conversationContext}\n${transcript}`;
+      console.log('[API] Resposta recebida:', text);
+      setTranscript('');
 
-            console.log('[API] Solicitando resposta...');
-            const { text, audioUrl } = await getIaraAIResponse(prompt);
+      if (audioUrl) {
+        await playAudioFromUrl(audioUrl);
+      }
 
-            console.log('[API] Resposta recebida:', text);
-            const assistantMessage: Message = { role: 'assistant', content: text };
-            setMessages(msgs => [...msgs, assistantMessage]);
-
-            if (audioUrl) {
-              await playAudioFromUrl(audioUrl);
-            }
-
-            setIsSpeaking(false);
-            setIsListening(true);
-          } catch (error) {
-            console.error('[Processamento] Erro:', error);
-            toast({
-              title: 'Erro',
-              description: 'Ocorreu um erro ao processar sua mensagem.',
-              variant: 'destructive',
-            });
-            setIsSpeaking(false);
-          }
-        })();
-
-        return updatedMessages;
-      });
+      setIsSpeaking(false);
+      setIsListening(true);
     } catch (error) {
-      console.error('[Transcript] Erro durante o processamento:', error);
+      console.error('[Processamento] Erro:', error);
       toast({
         title: 'Erro',
-        description: 'Falha ao processar sua mensagem.',
+        description: 'Ocorreu um erro ao processar sua mensagem.',
         variant: 'destructive',
       });
       setIsSpeaking(false);
+      setTranscript('');
     }
   }, [toast]);
 
@@ -112,7 +84,11 @@ const Index = () => {
         recognition.interimResults = false;
         recognition.lang = 'pt-BR';
 
-        recognition.onstart = () => setIsListening(true);
+        recognition.onstart = () => {
+          setIsListening(true);
+          setTranscript('Estou ouvindo, pode falar...');
+        };
+
         recognition.onresult = (event: any) => {
           const current = event.resultIndex;
           const finalTranscript = event.results[current][0].transcript;
