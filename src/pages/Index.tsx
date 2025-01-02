@@ -1,19 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Avatar } from '@/components/ui/avatar';
-import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { useToast } from '@/hooks/use-toast';
-import { getGeminiResponse } from '@/services/gemini';
-import { getGroqResponse } from '@/services/groq';
 import { getIaraAIResponse } from '@/services/iaraai';
-import { synthesizeSpeech as synthesizeWithPolly } from '@/services/polly';
-import { synthesizeSpeech as synthesizeWithTTSOpenAI } from '@/services/ttsopenai';
-import { Button } from '@/components/ui/button';
-import { Mic, MicOff } from 'lucide-react';
-import { ProviderSelector } from '@/components/ProviderSelector';
+import { AudioInterface } from '@/components/AudioInterface';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
 }
 
 const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
@@ -29,19 +28,10 @@ const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
   }
 };
 
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [provider, setProvider] = useState('groq');
-  const [ttsProvider, setTTSProvider] = useState<'polly' | 'ttsopenai' | 'iaraai'>('polly');
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -54,7 +44,7 @@ const Index = () => {
       setIsListening(false);
       setIsSpeaking(true);
 
-      setMessages((prevMessages) => {
+      setMessages(prevMessages => {
         const userMessage: Message = { role: 'user', content: transcript };
         const updatedMessages = [...prevMessages, userMessage];
 
@@ -64,32 +54,10 @@ const Index = () => {
             const prompt = `${conversationContext}\n${transcript}`;
 
             console.log('[API] Solicitando resposta...');
-            let response: string;
-            let audioUrl: string | null = null;
+            const { text, audioUrl } = await getIaraAIResponse(prompt);
 
-            if (provider === 'iaraai') {
-              const iaraResponse = await getIaraAIResponse(prompt);
-              response = iaraResponse.text;
-              audioUrl = iaraResponse.audioUrl;
-              console.log('[IARA AI] Áudio URL recebida:', audioUrl);
-            } else {
-              response = provider === 'gemini' 
-                ? await getGeminiResponse(prompt)
-                : await getGroqResponse(prompt);
-              
-              if (ttsProvider === 'polly') {
-                console.log('[TTS] Utilizando Polly...');
-                const audioData = await synthesizeWithPolly(response);
-                const blob = new Blob([audioData], { type: 'audio/mpeg' });
-                audioUrl = URL.createObjectURL(blob);
-              } else if (ttsProvider === 'ttsopenai') {
-                console.log('[TTS] Utilizando TTS OpenAI...');
-                audioUrl = await synthesizeWithTTSOpenAI(response);
-              }
-            }
-
-            console.log('[API] Resposta recebida:', response);
-            const assistantMessage: Message = { role: 'assistant', content: response };
+            console.log('[API] Resposta recebida:', text);
+            const assistantMessage: Message = { role: 'assistant', content: text };
             setMessages(msgs => [...msgs, assistantMessage]);
 
             if (audioUrl) {
@@ -120,7 +88,7 @@ const Index = () => {
       });
       setIsSpeaking(false);
     }
-  }, [toast, provider, ttsProvider]);
+  }, [toast]);
 
   useEffect(() => {
     if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
@@ -199,44 +167,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-8">
-      <div className="text-center space-y-4 max-w-md mx-auto">
-        <h1 className="text-2xl font-semibold tracking-tight">Iara Hub - Assistente IA</h1>
-        <p className="text-sm text-muted-foreground">
-          {isListening ? 'Escutando...' : 'Clique no microfone para começar'}
-        </p>
-
-        <ProviderSelector
-          provider={provider}
-          onProviderChange={setProvider}
-          ttsProvider={ttsProvider}
-          onTTSProviderChange={(value) => setTTSProvider(value as 'polly' | 'ttsopenai' | 'iaraai')}
-        />
-
-        <Button
-          onClick={toggleListening}
-          variant={isListening ? 'destructive' : 'default'}
-          className="mt-4"
-        >
-          {isListening ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
-          {isListening ? 'Parar' : 'Iniciar'}
-        </Button>
-      </div>
-
-      <div className="relative">
-        <Avatar className={isListening ? 'animate-pulse' : ''} />
-        <AudioVisualizer 
-          isActive={isListening || isSpeaking} 
-          mode={isListening ? 'user' : 'ai'} 
-        />
-      </div>
-
-      {transcript && (
-        <div className="glass-panel p-4 rounded-lg max-w-md w-full mx-auto">
-          <p className="text-sm text-center">{transcript}</p>
-        </div>
-      )}
-    </div>
+    <AudioInterface
+      isListening={isListening}
+      isSpeaking={isSpeaking}
+      transcript={transcript}
+      onToggleListening={toggleListening}
+    />
   );
 };
 

@@ -10,17 +10,17 @@ export const getIaraAIResponse = async (prompt: string): Promise<{ text: string;
       headers: {
         'Content-Type': 'application/json'
       },
-      responseType: 'arraybuffer' // Importante: especifica que esperamos um buffer
+      responseType: 'arraybuffer'
     });
 
-    // Converte o buffer em base64 e cria uma URL do blob
     const audioBlob = new Blob([response.data], { type: 'audio/wav' });
     const audioUrl = URL.createObjectURL(audioBlob);
+    
+    // Como o texto da resposta não está mais disponível no cabeçalho,
+    // vamos usar o prompt como texto da resposta
+    const text = prompt;
 
-    // Extrai o texto da resposta do cabeçalho
-    const text = response.headers['x-response-text'] || 'Resposta da IARA AI';
-
-    console.log('[IARA AI] Resposta recebida:', { text, audioUrl });
+    console.log('[IARA AI] Áudio URL gerada:', audioUrl);
     
     return {
       text,
