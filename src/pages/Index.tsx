@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { AudioInterface } from '@/components/AudioInterface';
+import { PinDialog } from '@/components/PinDialog';
 
 declare global {
   interface Window {
@@ -27,6 +28,7 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -139,17 +141,32 @@ const Index = () => {
     };
   }, [isListening, processTranscript, toast]);
 
-  const toggleListening = () => {
-    setIsListening((prev) => !prev);
+  const handleToggleListening = () => {
+    if (!isListening) {
+      setIsPinDialogOpen(true);
+    } else {
+      setIsListening(false);
+    }
+  };
+
+  const handlePinSuccess = () => {
+    setIsListening(true);
   };
 
   return (
-    <AudioInterface
-      isListening={isListening}
-      isSpeaking={isSpeaking}
-      transcript={transcript}
-      onToggleListening={toggleListening}
-    />
+    <>
+      <AudioInterface
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        transcript={transcript}
+        onToggleListening={handleToggleListening}
+      />
+      <PinDialog
+        isOpen={isPinDialogOpen}
+        onClose={() => setIsPinDialogOpen(false)}
+        onSuccess={handlePinSuccess}
+      />
+    </>
   );
 };
 
