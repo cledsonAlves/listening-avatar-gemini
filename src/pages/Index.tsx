@@ -37,6 +37,12 @@ const Index = () => {
 
     try {
       console.log('[Transcript] Processando:', transcript);
+      
+      // Parar de escutar enquanto processa
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
       setIsListening(false);
       setIsSpeaking(true);
       setTranscript('Pensando...');
@@ -51,8 +57,9 @@ const Index = () => {
       }
 
       setIsSpeaking(false);
-      setIsListening(true);
       setTranscript('');
+      // Reiniciar a escuta após a resposta
+      setIsListening(true);
     } catch (error) {
       console.error('[Processamento] Erro:', error);
       toast({
@@ -62,6 +69,7 @@ const Index = () => {
       });
       setIsSpeaking(false);
       setTranscript('');
+      setIsListening(true);
     }
   }, [toast]);
 
@@ -78,7 +86,7 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening) {
+    if (isListening && !isSpeaking) {
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -98,7 +106,7 @@ const Index = () => {
 
           if (event.results[current].isFinal) {
             setTranscript(finalTranscript);
-            // Removido o processamento automático aqui
+            processTranscript(finalTranscript);
           }
         };
 
@@ -139,7 +147,7 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, toast]);
+  }, [isListening, isSpeaking, processTranscript, toast]);
 
   const handleToggleListening = () => {
     if (!isListening) {
@@ -150,6 +158,7 @@ const Index = () => {
   };
 
   const handlePinSuccess = () => {
+    setIsPinDialogOpen(false);
     setIsListening(true);
   };
 
