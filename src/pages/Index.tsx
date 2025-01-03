@@ -97,8 +97,8 @@ const Index = () => {
           const finalTranscript = event.results[current][0].transcript;
 
           if (event.results[current].isFinal) {
-            setTranscript('');
-            processTranscript(finalTranscript);
+            setTranscript(finalTranscript);
+            // Removido o processamento automático aqui
           }
         };
 
@@ -139,7 +139,7 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, processTranscript, toast]);
+  }, [isListening, toast]);
 
   const handleToggleListening = () => {
     if (!isListening) {
