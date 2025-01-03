@@ -10,14 +10,13 @@ export const getIaraAIResponse = async (prompt: string): Promise<{ text: string;
       headers: {
         'Content-Type': 'application/json'
       },
-      responseType: 'arraybuffer'
+      responseType: 'arraybuffer',
+      timeout: 30000 // 30 segundos de timeout
     });
 
     const audioBlob = new Blob([response.data], { type: 'audio/wav' });
     const audioUrl = URL.createObjectURL(audioBlob);
     
-    // Como o texto da resposta não está mais disponível no cabeçalho,
-    // vamos usar o prompt como texto da resposta
     const text = prompt;
 
     console.log('[IARA AI] Áudio URL gerada:', audioUrl);

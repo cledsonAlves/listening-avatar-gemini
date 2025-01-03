@@ -37,12 +37,12 @@ const Index = () => {
       console.log('[Transcript] Processando:', transcript);
       setIsListening(false);
       setIsSpeaking(true);
-      setTranscript('Aguarde, estou processando sua mensagem...');
+      setTranscript('Pensando...');
 
       const { text, audioUrl } = await getIaraAIResponse(transcript);
 
       console.log('[API] Resposta recebida:', text);
-      setTranscript('');
+      setTranscript('Gerando áudio...');
 
       if (audioUrl) {
         await playAudioFromUrl(audioUrl);
@@ -50,11 +50,12 @@ const Index = () => {
 
       setIsSpeaking(false);
       setIsListening(true);
+      setTranscript('');
     } catch (error) {
       console.error('[Processamento] Erro:', error);
       toast({
         title: 'Erro',
-        description: 'Ocorreu um erro ao processar sua mensagem.',
+        description: 'Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
         variant: 'destructive',
       });
       setIsSpeaking(false);
