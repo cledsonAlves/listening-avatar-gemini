@@ -11,25 +11,15 @@ declare global {
   }
 }
 
-let currentAudio: HTMLAudioElement | null = null;
-
 const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
   try {
     console.log('[Audio] Reproduzindo áudio da URL:', audioUrl);
     const audio = new Audio(audioUrl);
-    currentAudio = audio;
     await audio.play();
-    audio.onended = () => {
-      console.log('[Audio] Reprodução finalizada.');
-      currentAudio = null;
-    };
-    audio.onerror = (e) => {
-      console.error('[Audio] Erro durante a reprodução:', e);
-      currentAudio = null;
-    };
+    audio.onended = () => console.log('[Audio] Reprodução finalizada.');
+    audio.onerror = (e) => console.error('[Audio] Erro durante a reprodução:', e);
   } catch (error) {
     console.error('[Audio] Erro ao reproduzir o áudio:', error);
-    currentAudio = null;
     throw error;
   }
 };
@@ -47,6 +37,12 @@ const Index = () => {
 
     try {
       console.log('[Transcript] Processando:', transcript);
+      
+      // Parar de escutar enquanto processa
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
       setIsListening(false);
       setIsSpeaking(true);
       setTranscript('Pensando...');
@@ -62,6 +58,7 @@ const Index = () => {
 
       setIsSpeaking(false);
       setTranscript('');
+      // Reiniciar a escuta após a resposta
       setIsListening(true);
     } catch (error) {
       console.error('[Processamento] Erro:', error);
@@ -89,14 +86,7 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening) {
-      // Se houver um áudio tocando, para ele
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio = null;
-        setIsSpeaking(false);
-      }
-
+    if (isListening && !isSpeaking) {
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -157,7 +147,7 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, processTranscript, toast]);
+  }, [isListening, isSpeaking, processTranscript, toast]);
 
   const handleToggleListening = () => {
     if (!isListening) {
