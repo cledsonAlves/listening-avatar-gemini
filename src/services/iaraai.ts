@@ -4,7 +4,7 @@ export const getIaraAIResponse = async (prompt: string): Promise<{ text: string;
   try {
     console.log('[IARA AI] Enviando prompt:', prompt);
     
-    const response = await axios.post('https://bff-iarahub.vercel.app/api/openai', {
+    const response = await axios.post('https://bff-iarahub.vercel.app/api/ia/openai', {
       prompt: prompt
     }, {
       headers: {
