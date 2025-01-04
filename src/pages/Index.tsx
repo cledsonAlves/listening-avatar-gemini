@@ -44,15 +44,16 @@ const Index = () => {
       const { text, audioUrl } = await getIaraAIResponse(transcript);
 
       console.log('[API] Resposta recebida:', text);
-      setTranscript('Gerando áudio...');
+      setTranscript('Respondendo...');
 
       if (audioUrl) {
         await playAudioFromUrl(audioUrl);
       }
 
       setIsSpeaking(false);
-      setIsListening(true);
       setTranscript('');
+      // Reativamos o microfone apenas após a IA terminar de falar
+      setIsListening(true);
     } catch (error) {
       console.error('[Processamento] Erro:', error);
       toast({
@@ -62,6 +63,7 @@ const Index = () => {
       });
       setIsSpeaking(false);
       setTranscript('');
+      setIsListening(false); // Mantém o microfone desligado em caso de erro
     }
   }, [toast]);
 
@@ -78,7 +80,7 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening) {
+    if (isListening && !isSpeaking) { // Só ativa o reconhecimento se não estiver falando
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -88,6 +90,7 @@ const Index = () => {
         recognition.lang = 'pt-BR';
 
         recognition.onstart = () => {
+          console.log('[Recognition] Iniciando reconhecimento de voz');
           setIsListening(true);
           setTranscript('Estou ouvindo, pode falar...');
         };
@@ -97,6 +100,7 @@ const Index = () => {
           const finalTranscript = event.results[current][0].transcript;
 
           if (event.results[current].isFinal) {
+            console.log('[Recognition] Texto final reconhecido:', finalTranscript);
             setTranscript('');
             processTranscript(finalTranscript);
           }
@@ -132,6 +136,7 @@ const Index = () => {
         setIsListening(false);
       }
     } else if (recognitionRef.current) {
+      console.log('[Recognition] Parando reconhecimento de voz');
       recognitionRef.current.stop();
     }
 
@@ -139,10 +144,10 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, processTranscript, toast]);
+  }, [isListening, isSpeaking, processTranscript, toast]);
 
   const handleToggleListening = () => {
-    if (!isListening) {
+    if (!isListening && !isSpeaking) { // Só permite ativar se não estiver falando
       setIsPinDialogOpen(true);
     } else {
       setIsListening(false);
@@ -150,6 +155,7 @@ const Index = () => {
   };
 
   const handlePinSuccess = () => {
+    setIsPinDialogOpen(false);
     setIsListening(true);
   };
 
