@@ -6,7 +6,7 @@ export const synthesizeSpeech = async (text: string): Promise<string> => {
   try {
     const response = await axios.get("https://bff-iarahub.vercel.app/api/webhook", {
       params: { text },
-      timeout: 90000, // Timeout de 30 segundos
+      timeout: 30000, // Timeout de 30 segundos
     });
 
     if (response.data && response.data.mediaUrl) {

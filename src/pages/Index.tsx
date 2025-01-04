@@ -1,8 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { AudioInterface } from '@/components/AudioInterface';
-import { PinDialog } from '@/components/PinDialog';
 
 declare global {
   interface Window {
@@ -28,7 +27,6 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -44,16 +42,15 @@ const Index = () => {
       const { text, audioUrl } = await getIaraAIResponse(transcript);
 
       console.log('[API] Resposta recebida:', text);
-      setTranscript('Respondendo...');
+      setTranscript('Gerando áudio...');
 
       if (audioUrl) {
         await playAudioFromUrl(audioUrl);
       }
 
       setIsSpeaking(false);
-      setTranscript('');
-      // Reativamos o microfone apenas após a IA terminar de falar
       setIsListening(true);
+      setTranscript('');
     } catch (error) {
       console.error('[Processamento] Erro:', error);
       toast({
@@ -63,7 +60,6 @@ const Index = () => {
       });
       setIsSpeaking(false);
       setTranscript('');
-      setIsListening(false); // Mantém o microfone desligado em caso de erro
     }
   }, [toast]);
 
@@ -80,7 +76,7 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening && !isSpeaking) { // Só ativa o reconhecimento se não estiver falando
+    if (isListening) {
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -90,7 +86,6 @@ const Index = () => {
         recognition.lang = 'pt-BR';
 
         recognition.onstart = () => {
-          console.log('[Recognition] Iniciando reconhecimento de voz');
           setIsListening(true);
           setTranscript('Estou ouvindo, pode falar...');
         };
@@ -100,7 +95,6 @@ const Index = () => {
           const finalTranscript = event.results[current][0].transcript;
 
           if (event.results[current].isFinal) {
-            console.log('[Recognition] Texto final reconhecido:', finalTranscript);
             setTranscript('');
             processTranscript(finalTranscript);
           }
@@ -136,7 +130,6 @@ const Index = () => {
         setIsListening(false);
       }
     } else if (recognitionRef.current) {
-      console.log('[Recognition] Parando reconhecimento de voz');
       recognitionRef.current.stop();
     }
 
@@ -144,35 +137,19 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, isSpeaking, processTranscript, toast]);
+  }, [isListening, processTranscript, toast]);
 
-  const handleToggleListening = () => {
-    if (!isListening && !isSpeaking) { // Só permite ativar se não estiver falando
-      setIsPinDialogOpen(true);
-    } else {
-      setIsListening(false);
-    }
-  };
-
-  const handlePinSuccess = () => {
-    setIsPinDialogOpen(false);
-    setIsListening(true);
+  const toggleListening = () => {
+    setIsListening((prev) => !prev);
   };
 
   return (
-    <>
-      <AudioInterface
-        isListening={isListening}
-        isSpeaking={isSpeaking}
-        transcript={transcript}
-        onToggleListening={handleToggleListening}
-      />
-      <PinDialog
-        isOpen={isPinDialogOpen}
-        onClose={() => setIsPinDialogOpen(false)}
-        onSuccess={handlePinSuccess}
-      />
-    </>
+    <AudioInterface
+      isListening={isListening}
+      isSpeaking={isSpeaking}
+      transcript={transcript}
+      onToggleListening={toggleListening}
+    />
   );
 };
 
