@@ -28,7 +28,8 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(true); // Start with dialog open
+  const [isPinVerified, setIsPinVerified] = useState(false);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -143,13 +144,19 @@ const Index = () => {
 
   const handleToggleListening = () => {
     if (!isListening) {
-      setIsPinDialogOpen(true);
+      // Only show PIN dialog if not yet verified
+      if (!isPinVerified) {
+        setIsPinDialogOpen(true);
+      } else {
+        setIsListening(true);
+      }
     } else {
       setIsListening(false);
     }
   };
 
   const handlePinSuccess = () => {
+    setIsPinVerified(true);
     setIsListening(true);
   };
 
