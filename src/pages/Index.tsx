@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { AudioInterface } from '@/components/AudioInterface';
-import { PinDialog } from '@/components/PinDialog';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 declare global {
   interface Window {
@@ -28,8 +32,7 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isPinDialogOpen, setIsPinDialogOpen] = useState(true); // Start with dialog open
-  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -40,29 +43,50 @@ const Index = () => {
       console.log('[Transcript] Processando:', transcript);
       setIsListening(false);
       setIsSpeaking(true);
-      setTranscript('Pensando...');
 
-      const { text, audioUrl } = await getIaraAIResponse(transcript);
+      setMessages(prevMessages => {
+        const userMessage: Message = { role: 'user', content: transcript };
+        const updatedMessages = [...prevMessages, userMessage];
 
-      console.log('[API] Resposta recebida:', text);
-      setTranscript('Gerando áudio...');
+        (async () => {
+          try {
+            const conversationContext = updatedMessages.map(msg => msg.content).join('\n');
+            const prompt = `${conversationContext}\n${transcript}`;
 
-      if (audioUrl) {
-        await playAudioFromUrl(audioUrl);
-      }
+            console.log('[API] Solicitando resposta...');
+            const { text, audioUrl } = await getIaraAIResponse(prompt);
 
-      setIsSpeaking(false);
-      // Removida a reativação automática do microfone
-      setTranscript('');
+            console.log('[API] Resposta recebida:', text);
+            const assistantMessage: Message = { role: 'assistant', content: text };
+            setMessages(msgs => [...msgs, assistantMessage]);
+
+            if (audioUrl) {
+              await playAudioFromUrl(audioUrl);
+            }
+
+            setIsSpeaking(false);
+            setIsListening(true);
+          } catch (error) {
+            console.error('[Processamento] Erro:', error);
+            toast({
+              title: 'Erro',
+              description: 'Ocorreu um erro ao processar sua mensagem.',
+              variant: 'destructive',
+            });
+            setIsSpeaking(false);
+          }
+        })();
+
+        return updatedMessages;
+      });
     } catch (error) {
-      console.error('[Processamento] Erro:', error);
+      console.error('[Transcript] Erro durante o processamento:', error);
       toast({
         title: 'Erro',
-        description: 'Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
+        description: 'Falha ao processar sua mensagem.',
         variant: 'destructive',
       });
       setIsSpeaking(false);
-      setTranscript('');
     }
   }, [toast]);
 
@@ -88,11 +112,7 @@ const Index = () => {
         recognition.interimResults = false;
         recognition.lang = 'pt-BR';
 
-        recognition.onstart = () => {
-          setIsListening(true);
-          setTranscript('Estou ouvindo, pode falar...');
-        };
-
+        recognition.onstart = () => setIsListening(true);
         recognition.onresult = (event: any) => {
           const current = event.resultIndex;
           const finalTranscript = event.results[current][0].transcript;
@@ -142,38 +162,17 @@ const Index = () => {
     };
   }, [isListening, processTranscript, toast]);
 
-  const handleToggleListening = () => {
-    if (!isListening) {
-      // Only show PIN dialog if not yet verified
-      if (!isPinVerified) {
-        setIsPinDialogOpen(true);
-      } else {
-        setIsListening(true);
-      }
-    } else {
-      setIsListening(false);
-    }
-  };
-
-  const handlePinSuccess = () => {
-    setIsPinVerified(true);
-    setIsListening(true);
+  const toggleListening = () => {
+    setIsListening((prev) => !prev);
   };
 
   return (
-    <>
-      <AudioInterface
-        isListening={isListening}
-        isSpeaking={isSpeaking}
-        transcript={transcript}
-        onToggleListening={handleToggleListening}
-      />
-      <PinDialog
-        isOpen={isPinDialogOpen}
-        onClose={() => setIsPinDialogOpen(false)}
-        onSuccess={handlePinSuccess}
-      />
-    </>
+    <AudioInterface
+      isListening={isListening}
+      isSpeaking={isSpeaking}
+      transcript={transcript}
+      onToggleListening={toggleListening}
+    />
   );
 };
 
