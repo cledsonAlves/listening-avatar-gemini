@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getIaraAIResponse } from '@/services/iaraai';
 import { AudioInterface } from '@/components/AudioInterface';
