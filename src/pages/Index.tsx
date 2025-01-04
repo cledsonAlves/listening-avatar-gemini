@@ -78,7 +78,7 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening) {
+    if (isListening && !isSpeaking) {
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -139,10 +139,10 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, toast]);
+  }, [isListening, isSpeaking, toast]);
 
   const handleToggleListening = () => {
-    if (!isListening) {
+    if (!isListening && !isSpeaking) {
       setIsPinDialogOpen(true);
     } else {
       setIsListening(false);
