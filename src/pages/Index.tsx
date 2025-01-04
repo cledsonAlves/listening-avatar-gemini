@@ -11,15 +11,25 @@ declare global {
   }
 }
 
+let currentAudio: HTMLAudioElement | null = null;
+
 const playAudioFromUrl = async (audioUrl: string): Promise<void> => {
   try {
     console.log('[Audio] Reproduzindo áudio da URL:', audioUrl);
     const audio = new Audio(audioUrl);
+    currentAudio = audio;
     await audio.play();
-    audio.onended = () => console.log('[Audio] Reprodução finalizada.');
-    audio.onerror = (e) => console.error('[Audio] Erro durante a reprodução:', e);
+    audio.onended = () => {
+      console.log('[Audio] Reprodução finalizada.');
+      currentAudio = null;
+    };
+    audio.onerror = (e) => {
+      console.error('[Audio] Erro durante a reprodução:', e);
+      currentAudio = null;
+    };
   } catch (error) {
     console.error('[Audio] Erro ao reproduzir o áudio:', error);
+    currentAudio = null;
     throw error;
   }
 };
@@ -51,8 +61,8 @@ const Index = () => {
       }
 
       setIsSpeaking(false);
-      setIsListening(true);
       setTranscript('');
+      setIsListening(true);
     } catch (error) {
       console.error('[Processamento] Erro:', error);
       toast({
@@ -62,6 +72,7 @@ const Index = () => {
       });
       setIsSpeaking(false);
       setTranscript('');
+      setIsListening(true);
     }
   }, [toast]);
 
@@ -78,7 +89,14 @@ const Index = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let timeoutId: NodeJS.Timeout;
 
-    if (isListening && !isSpeaking) {
+    if (isListening) {
+      // Se houver um áudio tocando, para ele
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        setIsSpeaking(false);
+      }
+
       try {
         recognitionRef.current = new SpeechRecognition();
         const recognition = recognitionRef.current;
@@ -139,10 +157,10 @@ const Index = () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       clearTimeout(timeoutId);
     };
-  }, [isListening, isSpeaking, toast, processTranscript]);
+  }, [isListening, processTranscript, toast]);
 
   const handleToggleListening = () => {
-    if (!isListening && !isSpeaking) {
+    if (!isListening) {
       setIsPinDialogOpen(true);
     } else {
       setIsListening(false);
@@ -150,6 +168,7 @@ const Index = () => {
   };
 
   const handlePinSuccess = () => {
+    setIsPinDialogOpen(false);
     setIsListening(true);
   };
 

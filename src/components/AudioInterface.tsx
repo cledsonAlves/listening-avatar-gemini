@@ -22,14 +22,13 @@ export const AudioInterface = ({
       <div className="text-center space-y-4 max-w-md mx-auto">
         <h1 className="text-2xl font-semibold tracking-tight">Iara Hub - Assistente IA</h1>
         <p className="text-sm text-muted-foreground">
-          {isSpeaking ? 'Respondendo...' : isListening ? 'Escutando...' : 'Clique no microfone para começar'}
+          {isListening ? 'Escutando...' : 'Clique no microfone para começar'}
         </p>
 
         <Button
           onClick={onToggleListening}
           variant={isListening ? 'destructive' : 'default'}
           className="mt-4"
-          disabled={isSpeaking}
         >
           {isListening ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
           {isListening ? 'Parar' : 'Iniciar'}
