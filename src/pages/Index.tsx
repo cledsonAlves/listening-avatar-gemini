@@ -51,7 +51,7 @@ const Index = () => {
       }
 
       setIsSpeaking(false);
-      setIsListening(true);
+      // Removida a reativação automática do microfone
       setTranscript('');
     } catch (error) {
       console.error('[Processamento] Erro:', error);
